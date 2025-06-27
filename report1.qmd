@@ -1,0 +1,368 @@
+---
+title: What can we expect from the data?
+subtitle: Statistics, Visualisation, Insights and Fallacies
+author: Jianqi Yang
+institute:
+- Westlake University
+- Westlake Institute for Advanced Study
+format:
+  beamer:
+    navigation: horizontal
+toc: true
+toc-title: Table of contents
+bibliography: ref.bib
+bibliographystyle: IEEE
+---
+
+```{r}
+library(tidyverse)
+library(quartets)
+library(tidymodels)
+library(DALEXtra)
+library(dplyr)
+library(broom)
+library(neuralnet)
+```
+
+# Descriptive statistics and visualisation
+
+## Descriptive statistics
+
+**Descriptive statistics** refers to a branch of statistics that involves summarizing, organizing, and presenting data meaningfully and concisely. It focuses on describing and analyzing a dataset's main features and characteristics without making any generalizations or inferences to a larger population.
+
+## Example 1
+
+How do you describe the data below?
+
+```{r}
+points_data <- data.frame(
+  x = c(55.4, 51.5, 46.2, 42.8, 40.8, 38.7, 35.6, 33.1, 29.0, 26.2),
+  y = c(97.2, 96.0, 94.5, 91.4, 88.3, 84.9, 79.9, 77.6, 74.5, 71.4)
+)
+
+print(points_data)
+cat("and so many")
+```
+
+## Example 1
+
+Naturally, we will use descriptive statistics:
+
+| $mean_x$ | $var_x$ | $mean_y$ | $var_y$ | $cor$ |
+|---------|:-----|------:|:------:|:------:|
+| 39.93   | 88.49   |    85.57 |   87.19   |   0.98   |
+
+## Example 1
+
+So what might this dataset be?
+
+- Some common points
+- A dinosaur
+- A star
+- Scratches left by kittens
+- X-Wing (May the Force be with you!)
+
+## Example 1
+Hopefully the X-Wing won't ruin the composition...
+```{r}
+ggplot(datasaurus_dozen, aes(x = x, y = y)) +
+  geom_point() + 
+  facet_wrap(~dataset)
+```
+
+## Example 1
+
+```{r}
+datasaurus_dozen |>
+  group_by(dataset) |>
+  summarise(mean_x = mean(x),
+            var_x = var(x),
+            mean_y = mean(y),
+            var_y = var(y),
+            cor = cor(x, y)) |>
+  knitr::kable(digits = 2)
+```
+
+## Regression Analysis
+
+Similar phenomena exist in more advanced forms of descriptive statistics, such as regression.
+
+## Example 2
+
+Based on Example 1, we have learnt that descriptive statistics are not sufficient to properly represent the nature of the dataset and that visualisation using scatterplots is a natural choice.
+
+Consider the following dataset:
+
+- mean of $x$: 9
+- variance of $x$: 11
+- mean of $y$: 7.5
+- variance of $y$: 4.125
+- correlation between $x$ and $y$: 0.816
+
+## Example 2
+
+```{r}
+ggplot(anscombe_quartet, aes(x = x, y = y)) +
+  geom_point() + 
+  facet_wrap(~dataset)
+```
+
+## Example 2
+
+- $y = 0.5x + 3$, $R^2$ : 0.67
+
+```{r}
+ggplot(anscombe_quartet, aes(x = x, y = y)) +
+  geom_point() + 
+  geom_smooth(method = "lm", formula = "y ~ x") +
+  facet_wrap(~dataset)
+```
+
+## Example 3
+
+```{r}
+ggplot(interaction_triptych, aes(x, y)) +
+  geom_point(shape = "o") +
+  geom_smooth(method = "lm", formula = "y ~ x") + 
+  facet_grid(dataset ~ moderator)
+```
+
+## Example 4
+
+```{r}
+ggplot(datasaurus_dozen, aes(x = x, y = y)) +
+  geom_point() + 
+  geom_smooth(method = "lm", formula = "y ~ x") +
+  facet_wrap(~dataset)
+```
+
+## Rethinking
+
+- Descriptive statistics are not actually describing
+- Statistical methods always entail a loss of information
+- Don't trust methods such as regression and, in particular, don't confuse correlation with causation
+
+I will cover the third point in the next section
+
+# Correlation & causation
+
+## An argument
+
+Which is correct?
+
+- correlation proves causation
+- correlation does not imply causation
+
+## Example 5
+
+```{r}
+ggplot(causal_quartet, aes(x = exposure, y = outcome)) +
+  geom_point() + 
+  geom_smooth(method = "lm", formula = "y ~ x") +
+  facet_wrap(~dataset)
+```
+
+## Example 5
+
+```{r}
+causal_quartet |>
+  nest_by(dataset) |>
+  mutate(`Y ~ X` = round(coef(lm(outcome ~ exposure, data = data))[2], 2),
+         `Y ~ X + Z` = round(coef(lm(outcome ~ exposure + covariate, data = data))[2], 2),
+         `Corr of X and Z` = round(cor(data$exposure, data$covariate), 2)) |>
+  select(-data, `Data generating mechanism` = dataset) |>
+  knitr::kable()
+```
+
+## Example 5
+
+Collider:
+
+$$
+\begin{aligned}&X\sim N(0,1)\\&Y=X+\varepsilon_{y}, \varepsilon_{y}\sim N(0,1)\\&Z=0.45X+0.77Y+\varepsilon_{z}, \varepsilon_{z}\sim N(0,1)\end{aligned}
+$$
+
+## Example 5
+
+Confounder:
+
+$$
+\begin{aligned}&Z\sim N(0,1)\\&X=Z+\varepsilon_{x}, \varepsilon_{x}\sim N(0,1)\\&Y=0.5X+Z+\varepsilon_{y}, \varepsilon_{y}\sim N(0,1)\end{aligned}
+$$
+
+## Example 5
+
+Mediator:
+
+$$
+\begin{aligned}&X\sim N(0,1)\\&Z=X+\varepsilon_{z}, \varepsilon_{z}\sim N(0,1)\\&Y=Z+\varepsilon_{y}, \varepsilon_{y}\sim N(0,1)\end{aligned}
+$$
+
+## Example 5
+
+M-Bias:
+
+$$
+\begin{aligned}
+&U_{1} \sim N(0,1) \\
+&U_{2} \sim N(0,1) \\
+&Z=8U_{1}+U_{2}+\varepsilon_{z}, \varepsilon_{z}\sim N(0,1) \\
+&X=U_{1}+\varepsilon_{x}, \varepsilon_{x}\sim N(0,1) \\
+&Y=X+U_{2}+\varepsilon_{y}, \varepsilon_{y}\sim N(0,1) 
+\end{aligned}
+$$
+
+## Example 6
+
+**ATE**: Average Treatment Effect, a measure used to compare treatments (or interventions) in randomized experiments, evaluation of policy interventions, and medical trials.
+
+## Example 6.1
+
+We can get the same average treatment effect despite variability across some pre-treatment characteristic (here called covariate).
+
+```{r}
+variation_causal_quartet |>
+  nest_by(dataset) |>
+  mutate(ATE = round(coef(lm(outcome ~ exposure, data = data))[2], 2)) |>
+  select(-data, dataset) |>
+  knitr::kable()
+```
+
+## Example 6.1
+
+```{r}
+ggplot(variation_causal_quartet, aes(x = covariate, y = outcome, color = factor(exposure))) + 
+  geom_point(alpha = 0.5) + 
+  facet_wrap(~ dataset) + 
+  labs(color = "exposure group")
+```
+
+## Example 6.2
+
+We can observe the same causal effect under different patterns of treatment heterogeneity.
+
+```{r}
+heterogeneous_causal_quartet |>
+  nest_by(dataset) |>
+  mutate(ATE = round(coef(lm(outcome ~ exposure, data = data))[2], 2)) |>
+  select(-data, dataset) |>
+  knitr::kable()
+```
+
+## Example 6.2
+
+```{r}
+ggplot(heterogeneous_causal_quartet, aes(x = covariate, y = outcome, color = factor(exposure))) + 
+  geom_point(alpha = 0.5) + 
+  facet_wrap(~ dataset) + 
+  labs(color = "exposure group")
+```
+
+# Causal Inference and Machine Learning
+
+## Introduction
+
+This phenomenon exists not only in the analysis of data sets, but also in the analysis of models. In essence, all models from linear regression to neural networks are functions abstracted from the dataset.
+
+## Example 7
+
+The three models clearly follow completely different design ideas and training processes, as can be easily noticed from the images:
+
+```{r}
+set.seed(42)
+
+rec <- recipe(y ~ ., data = rashomon_quartet_train)
+
+## Regression Tree
+
+wf_tree <- workflow() |>
+  add_recipe(rec) |>
+  add_model(
+    decision_tree(mode = "regression", engine = "rpart",
+                  tree_depth = 3, min_n = 250)
+  )
+
+tree <- fit(wf_tree, rashomon_quartet_train)
+exp_tree <- explain_tidymodels(
+  tree, 
+  data = rashomon_quartet_test[, -1], 
+  y = rashomon_quartet_test[, 1],
+  verbose = FALSE, 
+  label = "decision tree")
+
+## Linear Model
+
+wf_linear <- wf_tree |>
+  update_model(linear_reg())
+
+lin <- fit(wf_linear, rashomon_quartet_train)
+exp_lin <- explain_tidymodels(
+  lin, 
+  data = rashomon_quartet_test[, -1], 
+  y = rashomon_quartet_test[, 1],
+  verbose = FALSE, 
+  label = "linear regression")
+
+## Random Forest
+
+wf_rf <- wf_tree |>
+  update_model(rand_forest(mode = "regression", 
+                           engine = "randomForest", 
+                           trees = 100))
+
+rf <- fit(wf_rf, rashomon_quartet_train)
+exp_rf <- explain_tidymodels(
+  rf, 
+  data = rashomon_quartet_test[, -1], 
+  y = rashomon_quartet_test[, 1],
+  verbose = FALSE, 
+  label = "random forest")
+
+## Neural Network
+
+#> 
+#> Attaching package: 'neuralnet'
+#> The following object is masked from 'package:dplyr':
+#> 
+#>     compute
+nn <- neuralnet(
+  y ~ ., 
+  data = rashomon_quartet_train,
+  hidden = c(8, 4), 
+  threshold = 0.05)
+
+exp_nn <- explain_tidymodels(
+  nn, 
+  data = rashomon_quartet_test[, -1], 
+  y = rashomon_quartet_test[, 1],
+  verbose = FALSE, 
+  label = "neural network")
+```
+
+```{r}
+pd_tree <- model_profile(exp_tree, N=NULL)
+pd_lin <- model_profile(exp_lin, N=NULL)
+pd_rf <- model_profile(exp_rf, N=NULL)
+pd_nn <- model_profile(exp_nn, N=NULL)
+plot(pd_tree, pd_nn, pd_rf, pd_lin, title = NULL)
+```
+
+## Example 7
+
+However, they all have the same $R^2$ and $RMSE$.
+
+```{r}
+mp <- map(list(exp_tree, exp_lin, exp_rf, exp_nn), model_performance)
+tibble(
+  model = c("Decision tree", "Linear regression", "Random forest", "Neural network"),
+  R2 = map_dbl(mp, ~.x$measures$r2),
+  RMSE = map_dbl(mp, ~.x$measures$rmse)
+  ) |>
+  knitr::kable(digits = 2)
+```
+
+## Conclusion
+
+- Even the most sophisticated models that are data-driven only always face a Hume problem.
+- It should be borne in mind that causal inferences are always ‘inferences’ and remain in fact causeless.
+- Proper physical understanding and intuition of the system under study is the true foundation of data science.
